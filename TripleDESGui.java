@@ -1,5 +1,6 @@
-import javax.swing.*;
 import java.awt.*;
+import java.security.SecureRandom;
+import javax.swing.*;
 
 public class TripleDESGui extends JFrame {
     private TripleDESStandalone tripleDES;
@@ -51,6 +52,11 @@ public class TripleDESGui extends JFrame {
         outputArea = new JTextArea(5, 40);
         outputArea.setEditable(false);
         
+        // Set larger font for text areas
+        Font textAreaFont = new Font("Dialog", Font.PLAIN, 14);
+        inputArea.setFont(textAreaFont);
+        outputArea.setFont(textAreaFont);
+        
         JPanel inputPanel = new JPanel();
         inputPanel.setBorder(BorderFactory.createTitledBorder("Input Text"));
         inputPanel.add(new JScrollPane(inputArea));
@@ -98,15 +104,24 @@ public class TripleDESGui extends JFrame {
     }
 
     private void generateKeys() {
-        String key1 = "0123456789ABCDEF";
-        String key2 = "1133557799BBDDFF";
-        String key3 = "0022446688AACCEE";
-
-        key1Field.setText(key1);
-        key2Field.setText(key2);
-        key3Field.setText(key3);
-
         try {
+            SecureRandom random = new SecureRandom();
+            byte[] key1Bytes = new byte[8];
+            byte[] key2Bytes = new byte[8];
+            byte[] key3Bytes = new byte[8];
+            
+            random.nextBytes(key1Bytes);
+            random.nextBytes(key2Bytes);
+            random.nextBytes(key3Bytes);
+            
+            String key1 = bytesToHex(key1Bytes);
+            String key2 = bytesToHex(key2Bytes);
+            String key3 = bytesToHex(key3Bytes);
+
+            key1Field.setText(key1);
+            key2Field.setText(key2);
+            key3Field.setText(key3);
+
             tripleDES.setKeys(key1, key2, key3);
             statusLabel.setText("Keys generated successfully");
         } catch (Exception e) {
@@ -116,6 +131,14 @@ public class TripleDESGui extends JFrame {
 
     private void encrypt() {
         try {
+            // Get current keys from text fields
+            String key1 = key1Field.getText();
+            String key2 = key2Field.getText();
+            String key3 = key3Field.getText();
+            
+            // Update keys in the tripleDES instance
+            tripleDES.setKeys(key1, key2, key3);
+            
             String input = inputArea.getText();
             if (input.isEmpty()) {
                 statusLabel.setText("Please enter text to encrypt");
@@ -132,6 +155,14 @@ public class TripleDESGui extends JFrame {
 
     private void decrypt() {
         try {
+            // Get current keys from text fields
+            String key1 = key1Field.getText();
+            String key2 = key2Field.getText();
+            String key3 = key3Field.getText();
+            
+            // Update keys in the tripleDES instance
+            tripleDES.setKeys(key1, key2, key3);
+            
             String hexInput = inputArea.getText().trim().replaceAll("\\s", "");
             if (hexInput.isEmpty()) {
                 statusLabel.setText("Please enter hex text to decrypt");
@@ -176,4 +207,3 @@ public class TripleDESGui extends JFrame {
         });
     }
 }
- 
