@@ -1,13 +1,17 @@
 import java.awt.*;
 import java.security.SecureRandom;
 import javax.swing.*;
+import java.io.*;
+import java.nio.file.*;
 
 public class TripleDESGui extends JFrame {
     private TripleDESStandalone tripleDES;
     private JTextField key1Field, key2Field, key3Field;
     private JTextArea inputArea, outputArea;
     private JButton generateKeysButton, encryptButton, decryptButton;
+    private JButton encryptFileButton, decryptFileButton;
     private JLabel statusLabel;
+    private JComboBox<String> operationMode;
 
     public TripleDESGui() {
         tripleDES = new TripleDESStandalone();
@@ -45,6 +49,13 @@ public class TripleDESGui extends JFrame {
         JPanel genKeyPanel = new JPanel();
         genKeyPanel.add(generateKeysButton);
 
+        // Operation mode selector
+        String[] modes = {"Text Mode", "File Mode"};
+        operationMode = new JComboBox<>(modes);
+        JPanel modePanel = new JPanel();
+        modePanel.add(new JLabel("Operation Mode: "));
+        modePanel.add(operationMode);
+
         // Text areas
         JPanel textAreasPanel = new JPanel(new GridLayout(2, 1, 5, 5));
         
@@ -70,10 +81,15 @@ public class TripleDESGui extends JFrame {
 
         // Buttons
         JPanel buttonPanel = new JPanel(new FlowLayout());
-        encryptButton = new JButton("Encrypt");
-        decryptButton = new JButton("Decrypt");
+        encryptButton = new JButton("Encrypt Text");
+        decryptButton = new JButton("Decrypt Text");
+        encryptFileButton = new JButton("Encrypt File");
+        decryptFileButton = new JButton("Decrypt File");
+        
         buttonPanel.add(encryptButton);
         buttonPanel.add(decryptButton);
+        buttonPanel.add(encryptFileButton);
+        buttonPanel.add(decryptFileButton);
 
         // Status
         statusLabel = new JLabel("Ready");
@@ -83,6 +99,8 @@ public class TripleDESGui extends JFrame {
         // Add all components
         mainPanel.add(keysPanel);
         mainPanel.add(genKeyPanel);
+        mainPanel.add(Box.createRigidArea(new Dimension(0, 10)));
+        mainPanel.add(modePanel);
         mainPanel.add(Box.createRigidArea(new Dimension(0, 10)));
         mainPanel.add(textAreasPanel);
         mainPanel.add(Box.createRigidArea(new Dimension(0, 10)));
@@ -94,13 +112,29 @@ public class TripleDESGui extends JFrame {
         generateKeysButton.addActionListener(e -> generateKeys());
         encryptButton.addActionListener(e -> encrypt());
         decryptButton.addActionListener(e -> decrypt());
+        encryptFileButton.addActionListener(e -> encryptFile());
+        decryptFileButton.addActionListener(e -> decryptFile());
+        operationMode.addActionListener(e -> updateMode());
 
         // Add main panel to frame
         add(mainPanel);
 
         // Set frame properties
-        setSize(500, 600);
+        setSize(600, 700);
         setLocationRelativeTo(null);
+        
+        // Initial mode update
+        updateMode();
+    }
+
+    private void updateMode() {
+        boolean isTextMode = operationMode.getSelectedIndex() == 0;
+        inputArea.setEnabled(isTextMode);
+        outputArea.setEnabled(isTextMode);
+        encryptButton.setEnabled(isTextMode);
+        decryptButton.setEnabled(isTextMode);
+        encryptFileButton.setEnabled(!isTextMode);
+        decryptFileButton.setEnabled(!isTextMode);
     }
 
     private void generateKeys() {
@@ -131,14 +165,7 @@ public class TripleDESGui extends JFrame {
 
     private void encrypt() {
         try {
-            // Get current keys from text fields
-            String key1 = key1Field.getText();
-            String key2 = key2Field.getText();
-            String key3 = key3Field.getText();
-            
-            // Update keys in the tripleDES instance
-            tripleDES.setKeys(key1, key2, key3);
-            
+            updateKeys();
             String input = inputArea.getText();
             if (input.isEmpty()) {
                 statusLabel.setText("Please enter text to encrypt");
@@ -155,14 +182,7 @@ public class TripleDESGui extends JFrame {
 
     private void decrypt() {
         try {
-            // Get current keys from text fields
-            String key1 = key1Field.getText();
-            String key2 = key2Field.getText();
-            String key3 = key3Field.getText();
-            
-            // Update keys in the tripleDES instance
-            tripleDES.setKeys(key1, key2, key3);
-            
+            updateKeys();
             String hexInput = inputArea.getText().trim().replaceAll("\\s", "");
             if (hexInput.isEmpty()) {
                 statusLabel.setText("Please enter hex text to decrypt");
@@ -175,6 +195,78 @@ public class TripleDESGui extends JFrame {
         } catch (Exception e) {
             statusLabel.setText("Decryption error: " + e.getMessage());
         }
+    }
+
+    private void encryptFile() {
+        try {
+            updateKeys();
+            JFileChooser fileChooser = new JFileChooser();
+            if (fileChooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
+                File inputFile = fileChooser.getSelectedFile();
+                File outputFile = new File(inputFile.getParent(), inputFile.getName() + ".encrypted");
+                
+                if (outputFile.exists()) {
+                    int response = JOptionPane.showConfirmDialog(this,
+                        "Output file already exists. Overwrite?",
+                        "File exists",
+                        JOptionPane.YES_NO_OPTION);
+                    if (response != JOptionPane.YES_OPTION) {
+                        return;
+                    }
+                }
+
+                byte[] fileContent = Files.readAllBytes(inputFile.toPath());
+                byte[] encrypted = tripleDES.encrypt(fileContent);
+                Files.write(outputFile.toPath(), encrypted);
+                
+                statusLabel.setText("File encrypted successfully: " + outputFile.getName());
+            }
+        } catch (Exception e) {
+            statusLabel.setText("File encryption error: " + e.getMessage());
+        }
+    }
+
+    private void decryptFile() {
+        try {
+            updateKeys();
+            JFileChooser fileChooser = new JFileChooser();
+            if (fileChooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
+                File inputFile = fileChooser.getSelectedFile();
+                String outputName = inputFile.getName();
+                if (outputName.endsWith(".encrypted")) {
+                    outputName = outputName.substring(0, outputName.length() - 10);
+                } else {
+                    outputName += ".decrypted";
+                }
+                
+                File outputFile = new File(inputFile.getParent(), outputName);
+                
+                if (outputFile.exists()) {
+                    int response = JOptionPane.showConfirmDialog(this,
+                        "Output file already exists. Overwrite?",
+                        "File exists",
+                        JOptionPane.YES_NO_OPTION);
+                    if (response != JOptionPane.YES_OPTION) {
+                        return;
+                    }
+                }
+
+                byte[] fileContent = Files.readAllBytes(inputFile.toPath());
+                byte[] decrypted = tripleDES.decrypt(fileContent);
+                Files.write(outputFile.toPath(), decrypted);
+                
+                statusLabel.setText("File decrypted successfully: " + outputFile.getName());
+            }
+        } catch (Exception e) {
+            statusLabel.setText("File decryption error: " + e.getMessage());
+        }
+    }
+
+    private void updateKeys() {
+        String key1 = key1Field.getText();
+        String key2 = key2Field.getText();
+        String key3 = key3Field.getText();
+        tripleDES.setKeys(key1, key2, key3);
     }
 
     private static String bytesToHex(byte[] bytes) {
