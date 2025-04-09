@@ -203,7 +203,12 @@ public class TripleDESGui extends JFrame {
             JFileChooser fileChooser = new JFileChooser();
             if (fileChooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
                 File inputFile = fileChooser.getSelectedFile();
-                File outputFile = new File(inputFile.getParent(), inputFile.getName() + ".encrypted");
+                String baseName = inputFile.getName();
+                // Remove .txt if it exists
+                if (baseName.toLowerCase().endsWith(".txt")) {
+                    baseName = baseName.substring(0, baseName.length() - 4);
+                }
+                File outputFile = new File(inputFile.getParent(), baseName + "_encrypted.txt");
                 
                 if (outputFile.exists()) {
                     int response = JOptionPane.showConfirmDialog(this,
@@ -217,7 +222,9 @@ public class TripleDESGui extends JFrame {
 
                 byte[] fileContent = Files.readAllBytes(inputFile.toPath());
                 byte[] encrypted = tripleDES.encrypt(fileContent);
-                Files.write(outputFile.toPath(), encrypted);
+                // Convert encrypted bytes to hex string and save as text
+                String hexEncrypted = bytesToHex(encrypted);
+                Files.write(outputFile.toPath(), hexEncrypted.getBytes());
                 
                 statusLabel.setText("File encrypted successfully: " + outputFile.getName());
             }
@@ -232,14 +239,12 @@ public class TripleDESGui extends JFrame {
             JFileChooser fileChooser = new JFileChooser();
             if (fileChooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
                 File inputFile = fileChooser.getSelectedFile();
-                String outputName = inputFile.getName();
-                if (outputName.endsWith(".encrypted")) {
-                    outputName = outputName.substring(0, outputName.length() - 10);
-                } else {
-                    outputName += ".decrypted";
+                String baseName = inputFile.getName();
+                // Remove _encrypted.txt if it exists
+                if (baseName.toLowerCase().endsWith("_encrypted.txt")) {
+                    baseName = baseName.substring(0, baseName.length() - 13);
                 }
-                
-                File outputFile = new File(inputFile.getParent(), outputName);
+                File outputFile = new File(inputFile.getParent(), baseName + "decrypted.txt");
                 
                 if (outputFile.exists()) {
                     int response = JOptionPane.showConfirmDialog(this,
@@ -251,9 +256,14 @@ public class TripleDESGui extends JFrame {
                     }
                 }
 
-                byte[] fileContent = Files.readAllBytes(inputFile.toPath());
+                // Read the hex string from the file
+                String hexContent = new String(Files.readAllBytes(inputFile.toPath())).trim();
+                // Convert hex string to bytes
+                byte[] fileContent = hexToBytes(hexContent);
                 byte[] decrypted = tripleDES.decrypt(fileContent);
-                Files.write(outputFile.toPath(), decrypted);
+                // Convert to string and trim any trailing whitespace or null characters
+                String decryptedText = new String(decrypted).trim();
+                Files.write(outputFile.toPath(), decryptedText.getBytes());
                 
                 statusLabel.setText("File decrypted successfully: " + outputFile.getName());
             }
