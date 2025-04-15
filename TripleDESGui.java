@@ -197,36 +197,53 @@ public class TripleDESGui extends JFrame {
         }
     }
 
+    private String getFileExtension(File file) {
+        String name = file.getName();
+        int lastDot = name.lastIndexOf('.');
+        if (lastDot == -1 || lastDot == name.length() - 1) {
+            return ""; // brak rozszerzenia
+        }
+        return name.substring(lastDot + 1);
+    }
+    
     private void encryptFile() {
         try {
             updateKeys();
             JFileChooser fileChooser = new JFileChooser();
             if (fileChooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
                 File inputFile = fileChooser.getSelectedFile();
-                String baseName = inputFile.getName();
-                // Remove .txt if it exists
-                if (baseName.toLowerCase().endsWith(".txt")) {
-                    baseName = baseName.substring(0, baseName.length() - 4);
+                String originalExtension = getFileExtension(inputFile);
+                if (originalExtension == null) {
+                    originalExtension = ""; // fallback
                 }
-                File outputFile = new File(inputFile.getParent(), baseName + "_encrypted.txt");
-                
+    
+                File outputFile = new File(inputFile.getParent(), inputFile.getName() + ".bin");
+    
                 if (outputFile.exists()) {
                     int response = JOptionPane.showConfirmDialog(this,
-                        "Output file already exists. Overwrite?",
-                        "File exists",
-                        JOptionPane.YES_NO_OPTION);
+                            "Output file already exists. Overwrite?",
+                            "File exists",
+                            JOptionPane.YES_NO_OPTION);
                     if (response != JOptionPane.YES_OPTION) {
                         return;
                     }
                 }
-
+    
                 byte[] fileContent = Files.readAllBytes(inputFile.toPath());
-                byte[] encrypted = tripleDES.encrypt(fileContent);
-                // Convert encrypted bytes to hex string and save as text
-                String hexEncrypted = bytesToHex(encrypted);
-                Files.write(outputFile.toPath(), hexEncrypted.getBytes());
-                
-                statusLabel.setText("File encrypted successfully: " + outputFile.getName());
+    
+                // Add extension header (e.g., "pdf\0" + encrypted content)
+                byte[] extensionBytes = originalExtension.getBytes();
+                byte[] extensionLength = new byte[]{(byte) extensionBytes.length};
+    
+                byte[] dataToEncrypt = new byte[1 + extensionBytes.length + fileContent.length];
+                dataToEncrypt[0] = extensionLength[0];
+                System.arraycopy(extensionBytes, 0, dataToEncrypt, 1, extensionBytes.length);
+                System.arraycopy(fileContent, 0, dataToEncrypt, 1 + extensionBytes.length, fileContent.length);
+    
+                byte[] encrypted = tripleDES.encrypt(dataToEncrypt);
+    
+                Files.write(outputFile.toPath(), encrypted);
+                statusLabel.setText("File encrypted to: " + outputFile.getName());
             }
         } catch (Exception e) {
             statusLabel.setText("File encryption error: " + e.getMessage());
@@ -239,38 +256,40 @@ public class TripleDESGui extends JFrame {
             JFileChooser fileChooser = new JFileChooser();
             if (fileChooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
                 File inputFile = fileChooser.getSelectedFile();
+    
+                byte[] encryptedContent = Files.readAllBytes(inputFile.toPath());
+                byte[] decrypted = tripleDES.decrypt(encryptedContent);
+    
+                int extensionLength = decrypted[0];
+                String extension = new String(decrypted, 1, extensionLength);
+                byte[] actualFileData = new byte[decrypted.length - 1 - extensionLength];
+                System.arraycopy(decrypted, 1 + extensionLength, actualFileData, 0, actualFileData.length);
+    
                 String baseName = inputFile.getName();
-                // Remove _encrypted.txt if it exists
-                if (baseName.toLowerCase().endsWith("_encrypted.txt")) {
-                    baseName = baseName.substring(0, baseName.length() - 13);
+                if (baseName.toLowerCase().endsWith(".bin")) {
+                    baseName = baseName.substring(0, baseName.length() - 4);
                 }
-                File outputFile = new File(inputFile.getParent(), baseName + "decrypted.txt");
-                
+    
+                File outputFile = new File(inputFile.getParent(), baseName + "_decrypted." + extension);
+    
                 if (outputFile.exists()) {
                     int response = JOptionPane.showConfirmDialog(this,
-                        "Output file already exists. Overwrite?",
-                        "File exists",
-                        JOptionPane.YES_NO_OPTION);
+                            "Output file already exists. Overwrite?",
+                            "File exists",
+                            JOptionPane.YES_NO_OPTION);
                     if (response != JOptionPane.YES_OPTION) {
                         return;
                     }
                 }
-
-                // Read the hex string from the file
-                String hexContent = new String(Files.readAllBytes(inputFile.toPath())).trim();
-                // Convert hex string to bytes
-                byte[] fileContent = hexToBytes(hexContent);
-                byte[] decrypted = tripleDES.decrypt(fileContent);
-                // Convert to string and trim any trailing whitespace or null characters
-                String decryptedText = new String(decrypted).trim();
-                Files.write(outputFile.toPath(), decryptedText.getBytes());
-                
-                statusLabel.setText("File decrypted successfully: " + outputFile.getName());
+    
+                Files.write(outputFile.toPath(), actualFileData);
+                statusLabel.setText("File decrypted to: " + outputFile.getName());
             }
         } catch (Exception e) {
             statusLabel.setText("File decryption error: " + e.getMessage());
         }
     }
+    
 
     private void updateKeys() {
         String key1 = key1Field.getText();
