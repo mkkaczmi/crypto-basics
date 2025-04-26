@@ -217,33 +217,40 @@ public class TripleDESGui extends JFrame {
                     originalExtension = ""; // fallback
                 }
     
-                File outputFile = new File(inputFile.getParent(), inputFile.getName() + ".bin");
+                // Create a new file chooser for the output file
+                JFileChooser outputFileChooser = new JFileChooser();
+                outputFileChooser.setDialogTitle("Save Encrypted File");
+                outputFileChooser.setSelectedFile(new File(inputFile.getName() + ".bin"));
+                
+                if (outputFileChooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
+                    File outputFile = outputFileChooser.getSelectedFile();
     
-                if (outputFile.exists()) {
-                    int response = JOptionPane.showConfirmDialog(this,
-                            "Output file already exists. Overwrite?",
-                            "File exists",
-                            JOptionPane.YES_NO_OPTION);
-                    if (response != JOptionPane.YES_OPTION) {
-                        return;
+                    if (outputFile.exists()) {
+                        int response = JOptionPane.showConfirmDialog(this,
+                                "Output file already exists. Overwrite?",
+                                "File exists",
+                                JOptionPane.YES_NO_OPTION);
+                        if (response != JOptionPane.YES_OPTION) {
+                            return;
+                        }
                     }
+    
+                    byte[] fileContent = Files.readAllBytes(inputFile.toPath());
+    
+                    // Add extension header (e.g., "pdf\0" + encrypted content)
+                    byte[] extensionBytes = originalExtension.getBytes();
+                    byte[] extensionLength = new byte[]{(byte) extensionBytes.length};
+    
+                    byte[] dataToEncrypt = new byte[1 + extensionBytes.length + fileContent.length];
+                    dataToEncrypt[0] = extensionLength[0];
+                    System.arraycopy(extensionBytes, 0, dataToEncrypt, 1, extensionBytes.length);
+                    System.arraycopy(fileContent, 0, dataToEncrypt, 1 + extensionBytes.length, fileContent.length);
+    
+                    byte[] encrypted = tripleDES.encrypt(dataToEncrypt);
+    
+                    Files.write(outputFile.toPath(), encrypted);
+                    statusLabel.setText("File encrypted to: " + outputFile.getName());
                 }
-    
-                byte[] fileContent = Files.readAllBytes(inputFile.toPath());
-    
-                // Add extension header (e.g., "pdf\0" + encrypted content)
-                byte[] extensionBytes = originalExtension.getBytes();
-                byte[] extensionLength = new byte[]{(byte) extensionBytes.length};
-    
-                byte[] dataToEncrypt = new byte[1 + extensionBytes.length + fileContent.length];
-                dataToEncrypt[0] = extensionLength[0];
-                System.arraycopy(extensionBytes, 0, dataToEncrypt, 1, extensionBytes.length);
-                System.arraycopy(fileContent, 0, dataToEncrypt, 1 + extensionBytes.length, fileContent.length);
-    
-                byte[] encrypted = tripleDES.encrypt(dataToEncrypt);
-    
-                Files.write(outputFile.toPath(), encrypted);
-                statusLabel.setText("File encrypted to: " + outputFile.getName());
             }
         } catch (Exception e) {
             statusLabel.setText("File encryption error: " + e.getMessage());
@@ -270,20 +277,27 @@ public class TripleDESGui extends JFrame {
                     baseName = baseName.substring(0, baseName.length() - 4);
                 }
     
-                File outputFile = new File(inputFile.getParent(), baseName + "_decrypted." + extension);
+                // Create a new file chooser for the output file
+                JFileChooser outputFileChooser = new JFileChooser();
+                outputFileChooser.setDialogTitle("Save Decrypted File");
+                outputFileChooser.setSelectedFile(new File(baseName + "_decrypted." + extension));
+                
+                if (outputFileChooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
+                    File outputFile = outputFileChooser.getSelectedFile();
     
-                if (outputFile.exists()) {
-                    int response = JOptionPane.showConfirmDialog(this,
-                            "Output file already exists. Overwrite?",
-                            "File exists",
-                            JOptionPane.YES_NO_OPTION);
-                    if (response != JOptionPane.YES_OPTION) {
-                        return;
+                    if (outputFile.exists()) {
+                        int response = JOptionPane.showConfirmDialog(this,
+                                "Output file already exists. Overwrite?",
+                                "File exists",
+                                JOptionPane.YES_NO_OPTION);
+                        if (response != JOptionPane.YES_OPTION) {
+                            return;
+                        }
                     }
-                }
     
-                Files.write(outputFile.toPath(), actualFileData);
-                statusLabel.setText("File decrypted to: " + outputFile.getName());
+                    Files.write(outputFile.toPath(), actualFileData);
+                    statusLabel.setText("File decrypted to: " + outputFile.getName());
+                }
             }
         } catch (Exception e) {
             statusLabel.setText("File decryption error: " + e.getMessage());
