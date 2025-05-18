@@ -5,7 +5,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Random;
 
 public class ElGamalStandalone {
-    private BigInteger g, h, a, N;
+    private BigInteger g, h, a, p;
     private Random random;
 
     public ElGamalStandalone() {
@@ -100,17 +100,17 @@ public class ElGamalStandalone {
 
     // Core ElGamal methods
     public void generateKey() {
-        // Generate a large prime number N
-        N = BigInteger.probablePrime(512, random);
+        // Generate a large prime number p
+        p = BigInteger.probablePrime(512, random);
         
         // Find a generator g
-        g = findGenerator(N);
+        g = findGenerator(p);
         
         // Generate private key a
-        a = new BigInteger(512, random).mod(N.subtract(BigInteger.ONE));
+        a = new BigInteger(512, random).mod(p.subtract(BigInteger.ONE));
         
-        // Calculate public key h = g^a mod N
-        h = g.modPow(a, N);
+        // Calculate public key h = g^a mod p
+        h = g.modPow(a, p);
     }
 
     private BigInteger findGenerator(BigInteger p) {
@@ -126,20 +126,20 @@ public class ElGamalStandalone {
         if (message == null || message.length == 0) {
             throw new IllegalArgumentException("Message cannot be null or empty");
         }
-        if (g == null || h == null || N == null) {
+        if (g == null || h == null || p == null) {
             throw new IllegalStateException("Keys not initialized. Please generate keys first.");
         }
 
         try {
-            // Generate random k
-            BigInteger k = BigInteger.probablePrime(512, random);
-            BigInteger Nm1 = N.subtract(BigInteger.ONE);
-            while (!k.gcd(Nm1).equals(BigInteger.ONE)) {
-                k = k.nextProbablePrime();
+            // Generate random r
+            BigInteger r = BigInteger.probablePrime(512, random);
+            BigInteger Nm1 = p.subtract(BigInteger.ONE);
+            while (!r.gcd(Nm1).equals(BigInteger.ONE)) {
+                r = r.nextProbablePrime();
             }
 
-            // Calculate chunk size based on N's bit length
-            int chunkSize = (N.bitLength() - 1) / 8;
+            // Calculate chunk size based on p's bit length
+            int chunkSize = (p.bitLength() - 1) / 8;
             int chunks = (message.length + chunkSize - 1) / chunkSize; // Ceiling division
             BigInteger[] result = new BigInteger[chunks * 2];
 
@@ -151,11 +151,11 @@ public class ElGamalStandalone {
                 // Convert chunk to BigInteger
                 BigInteger m = new BigInteger(1, chunk);
                 
-                // Calculate c1 = g^k mod N
-                BigInteger c1 = g.modPow(k, N);
+                // Calculate c1 = g^r mod p
+                BigInteger c1 = g.modPow(r, p);
                 
-                // Calculate c2 = m * h^k mod N
-                BigInteger c2 = m.multiply(h.modPow(k, N)).mod(N);
+                // Calculate c2 = m * h^r mod p
+                BigInteger c2 = m.multiply(h.modPow(r, p)).mod(p);
                 
                 result[i] = c1;
                 result[chunks + i] = c2;
@@ -170,13 +170,13 @@ public class ElGamalStandalone {
         if (cipher == null || cipher.length == 0) {
             throw new IllegalArgumentException("Cipher cannot be null or empty");
         }
-        if (a == null || N == null) {
+        if (a == null || p == null) {
             throw new IllegalStateException("Keys not initialized. Please generate keys first.");
         }
 
         try {
             int chunks = cipher.length / 2;
-            int chunkSize = (N.bitLength() - 1) / 8;
+            int chunkSize = (p.bitLength() - 1) / 8;
             byte[] result = new byte[chunks * chunkSize];
             int resultIndex = 0;
             
@@ -184,10 +184,10 @@ public class ElGamalStandalone {
                 BigInteger c1 = cipher[i];
                 BigInteger c2 = cipher[chunks + i];
                 
-                // Calculate m = c2 * (c1^a)^(-1) mod N
-                BigInteger s = c1.modPow(a, N);
-                BigInteger sInv = s.modInverse(N);
-                BigInteger decrypted = c2.multiply(sInv).mod(N);
+                // Calculate m = c2 * (c1^a)^(-1) mod p
+                BigInteger s = c1.modPow(a, p);
+                BigInteger sInv = s.modInverse(p);
+                BigInteger decrypted = c2.multiply(sInv).mod(p);
                 
                 // Convert BigInteger to bytes
                 byte[] chunkBytes = decrypted.toByteArray();
@@ -223,7 +223,7 @@ public class ElGamalStandalone {
         }
         try {
             // Pad message to chunk size
-            int chunkSize = (N.bitLength() - 1) / 8;
+            int chunkSize = (p.bitLength() - 1) / 8;
             while (message.length() % chunkSize != 0) {
                 message += ' ';
             }
@@ -262,5 +262,5 @@ public class ElGamalStandalone {
     public BigInteger getG() { return g; }
     public BigInteger getH() { return h; }
     public BigInteger getA() { return a; }
-    public BigInteger getN() { return N; }
+    public BigInteger getN() { return p; }
 } 
